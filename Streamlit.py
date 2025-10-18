@@ -1,20 +1,18 @@
-# 📊 YouTube-аналітика у Streamlit (автоматичне завантаження демо-даних)
+# 📊YouTube-аналітика у Streamlit
 import streamlit as st
 import pandas as pd
 import numpy as np
 
+# --- Налаштування сторінки ---
 st.set_page_config(page_title="YouTube Analytics", layout="wide")
-st.title("📊 YouTube Аналітика каналів")
+st.title("📊 YouTube Аналітика каналів (автоматично)")
 
-# === 1️⃣ Завантаження CSV або автогенерація демо ===
-uploaded = st.file_uploader("🔽 Завантаж CSV (title, views, comments, likes, date, content_type)", type=["csv"])
-
-# Якщо CSV не завантажено — створюємо демо-дані
+# --- 1️⃣ Генерація демо-даних автоматично ---
 np.random.seed(1)
 n = 200
 days = np.random.choice(pd.date_range("2025-01-01", "2025-10-01").astype(str), n)
 hours = np.random.randint(0, 24, n)
-demo_df = pd.DataFrame({
+df = pd.DataFrame({
     "title": [f"Video {i+1}" for i in range(n)],
     "views": np.random.randint(100, 20000, n),
     "comments": np.random.randint(0, 500, n),
@@ -23,42 +21,30 @@ demo_df = pd.DataFrame({
     "content_type": np.random.choice(["Shorts", "Long-form", "Stream"], n)
 })
 
-df = pd.read_csv(uploaded) if uploaded else demo_df
-if not uploaded:
-    st.info("⚙️ Використовуються демо-дані (можна завантажити свій CSV у верхньому полі).")
-else:
-    st.success("✅ Дані завантажено!")
-
-# === 2️⃣ Обробка ===
+# --- 2️⃣ Обробка даних ---
 df["date"] = pd.to_datetime(df["date"], errors="coerce")
 df["day_of_week"] = df["date"].dt.day_name()
 df["hour"] = df["date"].dt.hour
 
-# === 3️⃣ Фільтри ===
-col1, col2, col3 = st.columns(3)
-with col1:
-    min_date, max_date = df["date"].min(), df["date"].max()
-    start_date = st.date_input("Початкова дата", min_date)
-with col2:
-    end_date = st.date_input("Кінцева дата", max_date)
-with col3:
-    content_filter = st.selectbox("Тип контенту", ["Усі"] + sorted(df["content_type"].unique()))
+# --- 3️⃣ Автоматичний фільтр (усі дані) ---
+filtered = df.copy()
+filtered["engagement_rate"] = ((filtered["likes"] + filtered["comments"]) /
+                               filtered["views"].replace(0, np.nan)) * 100
 
-filtered = df[
-    (df["date"] >= pd.to_datetime(start_date))
-    & (df["date"] <= pd.to_datetime(end_date))
-]
-if content_filter != "Усі":
-    filtered = filtered[filtered["content_type"] == content_filter]
-
-# === 4️⃣ Engagement rate ===
-filtered["engagement_rate"] = ((filtered["likes"] + filtered["comments"]) / filtered["views"].replace(0, np.nan)) * 100
+# --- 4️⃣ Метрики ---
 avg_eng = filtered["engagement_rate"].mean()
+total_views = filtered["views"].sum()
+total_likes = filtered["likes"].sum()
+total_comments = filtered["comments"].sum()
 
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("📺 Відео", len(filtered))
+col2.metric("👀 Перегляди", f"{total_views:,}")
+col3.metric("👍 Лайки", f"{total_likes:,}")
+col4.metric("💬 Коментарі", f"{total_comments:,}")
 st.metric("📈 Середній engagement rate", f"{avg_eng:.2f}%")
-st.write(f"Відео у вибірці: **{len(filtered)}**")
 
-# === 5️⃣ Імітація heatmap через кольори таблиці ===
+# --- 5️⃣ "Heatmap" активності (імітація кольорами) ---
 st.subheader("🔥 Активність переглядів (середні перегляди за день/годину)")
 
 pivot = filtered.groupby(["day_of_week", "hour"])["views"].mean().unstack(fill_value=0)
@@ -74,13 +60,13 @@ def color_intensity(val):
 
 st.dataframe(pivot.style.applymap(color_intensity))
 
-# === 6️⃣ Топ-10 за engagement ===
+# --- 6️⃣ Топ-10 відео ---
 st.subheader("🏆 Топ-10 відео за engagement rate")
 top10 = filtered.sort_values("engagement_rate", ascending=False).head(10)
-st.dataframe(top10[["title","views","likes","comments","engagement_rate"]])
+st.dataframe(top10[["title", "views", "likes", "comments", "engagement_rate"]])
 
-# === 7️⃣ Завантаження результатів ===
+# --- 7️⃣ Автоматичне збереження ---
 csv = filtered.to_csv(index=False).encode("utf-8")
 st.download_button("💾 Завантажити результати (CSV)", csv, "youtube_analysis.csv", "text/csv")
 
-st.success("✅ Аналіз завершено!")
+st.success("✅ Автоматичний аналіз завершено — усе готово!")
