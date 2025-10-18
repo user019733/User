@@ -16,7 +16,6 @@ else:
     st.info("⚙️ Дані не завантажено — створюю демо-набір...")
     np.random.seed(1)
     n = 200
-    # створимо дати як рядки (без datetime)
     days = np.random.choice(pd.date_range("2025-01-01", "2025-10-01").astype(str), n)
     hours = np.random.randint(0, 24, n)
     df = pd.DataFrame({
@@ -55,11 +54,22 @@ filtered["engagement_rate"] = ((filtered["likes"] + filtered["comments"]) / filt
 st.metric("📈 Середній engagement rate", f"{filtered['engagement_rate'].mean():.2f}%")
 st.write(f"Відео у вибірці: **{len(filtered)}**")
 
-# === 5️⃣ Heatmap активності (таблично) ===
-st.subheader("🔥 Heatmap активності (середні перегляди)")
-pivot = filtered.groupby(["day_of_week", "hour"])["views"].mean().unstack(fill_value=0)
+# === 5️⃣ "Heatmap" активності (імітація таблицею) ===
+st.subheader("🔥 Активність переглядів (середні перегляди за день/годину)")
+
+pivot = filtered.groupby(["day_of_week","hour"])["views"].mean().unstack(fill_value=0)
 pivot = pivot.reindex(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"])
-st.dataframe(pivot.style.background_gradient(cmap="YlOrRd"))
+
+# Нормалізуємо значення для кольорів
+max_val = pivot.values.max()
+def color_intensity(val):
+    if max_val == 0:
+        return ""
+    intensity = int((val / max_val) * 255)
+    color = f"background-color: rgba(255, {255-intensity}, {200-intensity//2}, 0.6);"
+    return color
+
+st.dataframe(pivot.style.applymap(color_intensity))
 
 # === 6️⃣ Топ-10 відео за engagement rate ===
 st.subheader("🏆 Топ-10 відео за engagement rate")
